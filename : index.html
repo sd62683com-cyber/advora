@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AdVora</title>
+<style>
+:root{--bg:#f6f5ff;--card:#fff;--tx:#1b1740;--mut:#6b6896;--p:#7c3aed;--b:#2563eb;--bd:#e3e0f7;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#110f26;--card:#1c1940;--tx:#f1efff;--mut:#a7a3d6;--bd:#322e63;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#110f26;--card:#1c1940;--tx:#f1efff;--mut:#a7a3d6;--bd:#322e63;color-scheme:dark}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+header{display:flex;align-items:center;gap:10px;padding:12px 16px;background:linear-gradient(135deg,var(--p),var(--b));color:#fff;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+header b{font-size:20px;letter-spacing:.3px}header small{opacity:.85;display:block;font-size:11px}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 12px;background:var(--card);border-bottom:1px solid var(--bd)}
+nav button{flex:none;border:0;background:transparent;color:var(--mut);padding:8px 14px;border-radius:20px;font:inherit;font-size:14px;cursor:pointer}
+nav button.on{background:linear-gradient(135deg,var(--p),var(--b));color:#fff}
+main{max-width:720px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:16px;margin-bottom:14px;animation:f .35s ease}
+@keyframes f{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+h2{margin:.2em 0 .5em;font-size:22px}h3{margin:.2em 0}p{margin:.4em 0}.mut{color:var(--mut);font-size:14px}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:11px;border:1px solid var(--bd);border-radius:12px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:90px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:0;border-radius:12px;padding:12px 18px;font:inherit;font-weight:600;color:#fff;background:linear-gradient(135deg,var(--p),var(--b));cursor:pointer;margin:12px 8px 0 0;transition:transform .15s}
+.btn:active{transform:scale(.97)}.btn.alt{background:var(--bg);color:var(--tx);border:1px solid var(--bd)}.btn:disabled{opacity:.5}
+pre{white-space:pre-wrap;word-wrap:break-word;font:inherit;background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:10px 0 0}
+.grid{display:grid;gap:12px}.plan{border:2px solid var(--bd);border-radius:14px;padding:14px}.plan.hot{border-color:var(--p)}
+.price{font-size:24px;font-weight:700}.note{border-left:4px solid var(--p);padding:8px 12px;background:var(--bg);border-radius:8px;font-size:14px}
+</style></head><body>
+<header><svg width="34" height="34" viewBox="0 0 40 40"><rect width="40" height="40" rx="11" fill="#fff" opacity=".2"/><path d="M8 31 20 8l12 23h-6l-6-12-6 12z" fill="#fff"/></svg><div><b>AdVora</b><small>La publicité intelligente, sans limites.</small></div></header>
+<nav id="nav"></nav><main id="v"></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const PAGES=[["home","Accueil"],["text","Texte"],["comm","Commentaires"],["video","Vidéo"],["proj","Mes projets"],["plans","Tarifs"],["set","Profil"]];
+let page="home",projects=[],profile={name:""},sampleFn=null,lastOut="";
+const ls={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+profile=ls.get("adv_prof",{name:""});
+const sb=supabase.createClient("https://ccdvoefgfphqdtycseuw.supabase.co","sb_publishable_GZw0BLXGZ3tnAT02w3brkQ_elJr-wSB");
+let user=null,amode="in";
+sampleFn=async(prompt)=>{const {data:{session}}=await sb.auth.getSession();const r=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+(session?session.access_token:"")},body:JSON.stringify({prompt})});let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error(j.error||"Erreur serveur ("+r.status+")");return {text:j.text}};
+async function loadProj(){const {data}=await sb.from("campaigns").select("*").order("created_at",{ascending:false});projects=(data||[]).map(r=>({id:r.id,type:r.type||"Création",title:r.title||"",text:r.content||"",date:new Date(r.created_at).toLocaleDateString("fr-FR")}))}
+function authUI(v){v.innerHTML=`<div class="card"><h2>${amode==="in"?"Connexion":"Créer un compte"}</h2>${amode==="up"?'<label>Prénom</label><input id="an">':""}<label>E-mail</label><input id="ae" type="email" autocomplete="email"><label>Mot de passe (8 caractères minimum)</label><input id="ap" type="password"><button class="btn" onclick="doAuth()">${amode==="in"?"Se connecter":"S’inscrire"}</button><button class="btn alt" onclick="amode=amode==='in'?'up':'in';render()">${amode==="in"?"Créer un compte":"J’ai déjà un compte"}</button>${amode==="in"?'<button class="btn alt" onclick="forgot()">Mot de passe oublié</button>':""}<p id="am" class="mut"></p></div>`}
+async function doAuth(){const e=$("#ae").value.trim(),p=$("#ap").value,m=$("#am");m.textContent="";if(!e||p.length<8){m.textContent="E-mail et mot de passe (8 caractères minimum) requis.";return}
+if(amode==="in"){const {error}=await sb.auth.signInWithPassword({email:e,password:p});if(error)m.textContent=error.message}
+else{const {data,error}=await sb.auth.signUp({email:e,password:p,options:{data:{full_name:$("#an").value}}});if(error)m.textContent=error.message;else if(!data.session)m.textContent="Compte créé. Vérifiez votre e-mail pour confirmer, puis connectez-vous."}}
+async function forgot(){const e=$("#ae").value.trim();if(!e){$("#am").textContent="Saisissez votre e-mail.";return}const {error}=await sb.auth.resetPasswordForEmail(e,{redirectTo:location.origin});$("#am").textContent=error?error.message:"E-mail de réinitialisation envoyé."}
+const esc=t=>String(t).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function nav(){if(!user){$("#nav").innerHTML="";return}$("#nav").innerHTML=PAGES.map(([k,n])=>`<button class="${k===page?"on":""}" onclick="go('${k}')">${n}</button>`).join("")}
+function go(p){page=p;lastOut="";nav();render();scrollTo(0,0)}
+const TONES=["Professionnel","Chaleureux","Dynamique","Luxe","Humoristique","Urgent"];
+const opt=a=>a.map(x=>`<option>${x}</option>`).join("");
+function form(kind){
+ const types={text:["Publicité complète","Slogans (10 idées)","Description de produit","Publication Facebook","Publication Instagram","Script TikTok","Annonce commerciale","Campagne marketing (3 messages)","Message WhatsApp"],
+ comm:["Commentaire promotionnel","Réponse professionnelle à un client","Réponse à un avis négatif","Appel à l’action (10 idées)","Message pour attirer des clients"],
+ video:["Script vidéo avec scènes, texte à l’écran et voix off"]}[kind];
+ return `<div class="card"><h2>${{text:"Créer un texte publicitaire",comm:"Commentaires promotionnels",video:"Script de votre vidéo"}[kind]}</h2>
+ <label>Type</label><select id="type">${opt(types)}</select>
+ <label>Que voulez-vous promouvoir ? (nom, produit, service, site, application…)</label>
+ <textarea id="desc" placeholder="Ex. : Restaurant Chez Awa à Abidjan, cuisine ivoirienne, livraison rapide"></textarea>
+ <div class="row"><div><label>Public ciblé</label><input id="aud" placeholder="Ex. : familles, étudiants"></div><div><label>Ton</label><select id="tone">${opt(TONES)}</select></div></div>
+ <div class="row"><div><label>Langue</label><select id="lang">${opt(["Français","English","Español","العربية"])}</select></div>
+ <div><label>Plateforme</label><select id="plat">${opt(["Toutes","TikTok","Facebook","Instagram","YouTube","WhatsApp"])}</select></div></div>
+ ${kind==="video"?`<div class="row"><div><label>Durée</label><select id="dur">${opt(["15 secondes","30 secondes","60 secondes"])}</select></div><div><label>Format</label><select id="fmt">${opt(["Vertical 9:16","Carré 1:1","Horizontal 16:9"])}</select></div></div>
+ <div class="row"><div><label>Voix off</label><select id="voice">${opt(["Féminine","Masculine"])}</select></div><div><label>Musique</label><select id="mus">${opt(["Énergique","Douce","Élégante","Festive"])}</select></div></div>`:""}
+ <button class="btn" id="go" onclick="gen('${kind}')">Générer avec l’IA</button>
+ <div id="out"></div></div>
+ ${kind==="video"?`<div class="note"><b>Important :</b> cette étape crée le script et le découpage de la vidéo. Le rendu vidéo, la voix et la musique réels demandent un service externe (étape suivante) et un serveur pour garder vos clés API secrètes.</div>`:""}`}
+async function gen(kind){
+ const g=i=>($("#"+i)||{}).value||"",d=g("desc").trim();
+ if(!d){$("#out").innerHTML="<p class=mut>Décrivez d’abord ce que vous voulez promouvoir.</p>";return}
+ if(!sampleFn){$("#out").innerHTML="<p class=mut>L’IA n’est pas disponible ici. Ouvrez la page depuis claude.ai et autorisez l’accès.</p>";return}
+ const extra=kind==="video"?`Durée : ${g("dur")}. Format : ${g("fmt")}. Voix off ${g("voice")}. Musique ${g("mus")}. Fournis un tableau de scènes (numéro, durée, visuel, texte à l’écran, voix off) puis la légende et les hashtags.`:"";
+ const prompt=`Tu es un expert en publicité. Tâche : ${g("type")}.\nSujet : ${d}\nPublic : ${g("aud")||"grand public"}\nTon : ${g("tone")}\nLangue : ${g("lang")}\nPlateforme : ${g("plat")}\n${extra}\nRÈGLES STRICTES : utilise uniquement les informations fournies ci-dessus. N’invente JAMAIS de prix, adresse, téléphone, horaires, promotion, réduction, statistique, récompense, témoignage, ancienneté ou ingrédient. Si une information utile manque, écris un champ à compléter entre crochets, par exemple [prix à compléter]. N’utilise AUCUN symbole Markdown (pas d’astérisques, de dièses ni de tableaux) : titres en MAJUSCULES sur leur propre ligne, listes avec des tirets. Écris directement le résultat, prêt à publier, avec un appel à l’action, sans introduction.`;
+ const b=$("#go");b.disabled=true;b.textContent="Génération…";
+ try{const r=await sampleFn(prompt,{cache:false,onText:({text})=>{lastOut=clean(text);show()}});lastOut=clean(r.text);show()}
+ catch(e){$("#out").innerHTML="<p class=mut>Erreur : "+esc(e.message||e.code||"réessayez")+"</p>"}
+ b.disabled=false;b.textContent="Générer avec l’IA";window._meta={kind,type:g("type"),desc:d}}
+function clean(t){return String(t).replace(/\r/g,"").replace(/\*\*|__|`/g,"").replace(/^\s{0,3}#{1,6}\s*/gm,"").replace(/^\s*[*•]\s+/gm,"- ").replace(/^\s*\|?[\s:|-]{3,}\|?\s*$/gm,"").replace(/^\s*\|(.*)\|\s*$/gm,(m,a)=>a.split("|").map(s=>s.trim()).filter(Boolean).join(" · ")).replace(/\*(\S[^*\n]*)\*/g,"$1").replace(/\n{3,}/g,"\n\n").trim()}
+function fmt(t){return t.split("\n").map(l=>{const s=l.trim();if(!s)return"<div style='height:8px'></div>";const e=esc(s.replace(/^-\s+/,""));if(/^-\s/.test(s))return`<div style='padding-left:16px;text-indent:-12px'>• ${e}</div>`;if(s.length<60&&s===s.toUpperCase()&&/[A-ZÀ-Ý]/.test(s))return`<div style='font-weight:700;color:var(--p);margin-top:10px'>${e}</div>`;return`<div>${e}</div>`}).join("")}
+function show(){$("#out").innerHTML=`<div style="background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-top:10px">${fmt(lastOut)}</div><button class="btn" onclick="cp()">Copier le texte</button><button class="btn alt" onclick="dl(lastOut,'advora-creation.txt')">Télécharger</button><button class="btn alt" onclick="save()">Enregistrer dans mes projets</button><button class="btn alt" onclick="regen()">Régénérer</button>`}
+function regen(){const m=window._meta;if(m)gen(m.kind)}
+async function cp(){try{await navigator.clipboard.writeText(lastOut);toast("Copié")}catch(e){toast("Copie impossible : sélectionnez le texte")}}
+function toast(t){const o=$("#out");o.insertAdjacentHTML("beforeend",`<p class=mut>${t}</p>`)}
+async function save(){const m=window._meta||{};if(!lastOut)return;const {error}=await sb.from("campaigns").insert({kind:m.kind,type:m.type||"Création",title:(m.desc||"").slice(0,50),content:lastOut});if(error){toast("Erreur : "+esc(error.message));return}await loadProj();toast("Enregistré dans Mes projets")}
+async function dl(text,name){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:"text/plain;charset=utf-8"}));a.download=name;document.body.appendChild(a);a.click();a.remove()}
+async function delp(id){await sb.from("campaigns").delete().eq("id",id);await loadProj();render()}
+function dlp(id){const p=projects.find(x=>x.id===id);dl(p.text,"advora-"+id+".txt")}
+function view(id){const p=projects.find(x=>x.id===id);lastOut=p.text;$("#pv"+id).innerHTML=`<div style="margin-top:10px">${fmt(p.text)}</div>`}
+const PLANS=[["Gratuit","0 €","5 créations / mois, textes uniquement"],["Standard","9 €/mois","100 créations, vidéos 30 s"],["Premium","29 €/mois","Illimité, vidéos 60 s, toutes voix","hot"],["Entreprise","Sur devis","Équipes, volumes élevés, support"]];
+function render(){const v=$("#v");if(!user){authUI(v);return}
+ if(page==="home")v.innerHTML=`<div class="card"><h2>Bonjour${profile.name?" "+esc(profile.name):""} 👋</h2><p>Décrivez votre activité en quelques mots : AdVora écrit pour vous textes, slogans, commentaires et scripts vidéo.</p><button class="btn" onclick="go('text')">Créer une publicité</button><button class="btn alt" onclick="go('video')">Script vidéo</button></div>
+ <div class="card"><h3>Votre tableau de bord</h3><p class="mut">${projects.length} projet(s) enregistré(s)</p><button class="btn alt" onclick="go('proj')">Voir mes projets</button></div>`;
+ else if(["text","comm","video"].includes(page))v.innerHTML=form(page);
+ else if(page==="proj")v.innerHTML=`<div class="card"><h2>Mes projets</h2>${projects.length?"":"<p class=mut>Rien pour l’instant. Générez puis appuyez sur Enregistrer.</p>"}</div>`+projects.map(p=>`<div class="card"><h3>${esc(p.title)}</h3><p class="mut">${esc(p.type)} · ${p.date}</p><button class="btn alt" onclick="view('${p.id}')">Voir</button><button class="btn alt" onclick="dlp('${p.id}')">Télécharger</button><button class="btn alt" onclick="delp('${p.id}')">Supprimer</button><div id="pv${p.id}"></div></div>`).join("");
+ else if(page==="plans")v.innerHTML=`<div class="card"><h2>Abonnements et tarifs</h2><div class="grid">${PLANS.map(p=>`<div class="plan ${p[3]||""}"><h3>${p[0]}</h3><div class="price">${p[1]}</div><p class="mut">${p[2]}</p></div>`).join("")}</div></div><div class="note">Tarifs indicatifs. Le paiement réel sera ajouté avec le serveur (étape suivante).</div>`;
+ else v.innerHTML=`<div class="card"><h2>Profil et paramètres</h2><label>Votre prénom</label><input id="pn" value="${esc(profile.name)}"><button class="btn" onclick="profile.name=$('#pn').value;ls.set('adv_prof',profile);toast2()">Enregistrer</button><p id="ok" class="mut"></p>
+ <label>Apparence</label><select onchange="document.documentElement.dataset.theme=this.value"><option value="">Automatique</option><option value="light">Clair</option><option value="dark">Sombre</option></select></div>
+ <button class="btn alt" onclick="sb.auth.signOut()">Se déconnecter</button>`}
+function toast2(){$("#ok").textContent="Enregistré"}
+sb.auth.onAuthStateChange((ev,sess)=>{user=sess?sess.user:null;setTimeout(async()=>{if(ev==="PASSWORD_RECOVERY"){const np=prompt("Nouveau mot de passe (8 caractères minimum)");if(np&&np.length>=8)await sb.auth.updateUser({password:np})}
+if(user){const n=(user.user_metadata||{}).full_name;if(!profile.name&&n)profile.name=n;await loadProj()}else projects=[];nav();render()},0)});
+nav();render();
+</script></body></html>
